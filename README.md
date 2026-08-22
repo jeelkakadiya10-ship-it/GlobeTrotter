@@ -1,47 +1,36 @@
-# 🌍 GlobeTrotter — Multi-City Trip Itinerary Planner
+# GlobeTrotter ✈️
 
-Turn "I want to visit 3 cities in Europe" into a day-by-day, budgeted, shareable itinerary in under 5 minutes.
+Plan a multi-city trip end-to-end — pick cities, add activities, book flights, track budget in your currency, and share it with a link.
 
-## 🚀 Features
+## Features
 
-- **Multi-City Itinerary Builder:** Add, remove, and reorder city stops with desktop Drag & Drop or mobile touch arrow fallbacks.
-- **Activity Discovery & Scheduling:** Scoped activity catalog with category filters, duration, and price estimates.
-- **Dynamic Budget Tracker:** Auto-syncs activity costs with custom expense line items (flights, hotels, food).
-- **Timeline & Day-by-Day Calendar:** Interactive view modes with day cards and hourly scheduled activities.
-- **Public Itinerary Sharing:** Shareable public links (`/share/:public_slug`) viewable with zero authentication.
-- **1-Click "Copy Trip":** Clone any public itinerary into your personal account.
-- **Admin Governance Portal:** Server-side role-gated analytics dashboard with real platform statistics and user account moderation.
+- Login with email/password or Google
+- Build a trip: add cities, activities, and flights
+- Itinerary view with list and calendar modes
+- Auto-updating budget breakdown (activities + flights)
+- Switch currency anywhere — updates prices across the whole app
+- Share a trip publicly with a read-only link
+- Admin dashboard for usage stats
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Frontend:** React 18, Vite, React Router v6, Tailwind CSS, Lucide Icons
-- **Backend:** Node.js, Express REST API, JWT Authentication, bcrypt password hashing
-- **Database:** Prisma ORM, Relational SQLite / PostgreSQL compatible schema
+Next.js (App Router, TypeScript) · Tailwind CSS + shadcn/ui · PostgreSQL · Prisma · NextAuth.js
 
-## 📦 Getting Started
+## Getting Started
 
-### 1. Install dependencies
-```bash
-npm run install-all
-```
-
-### 2. Set up Database & Demo Data
-```bash
-cd server
-npx prisma generate
-npx prisma db push
-npm run seed
-cd ..
-```
-
-### 3. Run Development Servers
-```bash
+\`\`\`bash
+git clone https://github.com/<your-username>/globetrotter.git
+cd globetrotter
+npm install
+cp .env.example .env   # fill in DATABASE_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID/SECRET
+npx prisma migrate dev
+npx prisma db seed
 npm run dev
-```
+\`\`\`
+## Project Structure
 
-Frontend will run at `http://localhost:5173` and backend API at `http://localhost:5000`.
-
-## 🔑 Demo Credentials
-
-- **Traveler User:** `traveler@globetrotter.com` / `password123`
-- **Admin User:** `admin@globetrotter.com` / `admin123`
+\`\`\`
+app/        Pages & API routes
+prisma/     Database schema & seed data
+lib/        Shared utilities (currency conversion, etc.)
+\`\`\`
