@@ -100,7 +100,7 @@ export const SavedTripsPage: React.FC = () => {
                   </span>
                   {trip.target_budget && (
                     <span className="font-bold text-slate-800">
-                      Budget: {formatPrice(trip.target_budget)}
+                      Budget: {formatPrice(trip.target_budget, { currency: trip.display_currency })}
                     </span>
                   )}
                 </div>

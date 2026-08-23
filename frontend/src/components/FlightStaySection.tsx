@@ -10,7 +10,7 @@ export interface FlightItem {
   to: string;
   date: string;
   time: string;
-  price: number;
+  price: number; // Stored in USD base
 }
 
 export interface StayItem {
@@ -19,22 +19,25 @@ export interface StayItem {
   city: string;
   checkIn: string;
   checkOut: string;
-  pricePerNight: number;
+  pricePerNight: number; // Stored in USD base
   totalNights: number;
 }
 
 interface FlightStaySectionProps {
   tripId: number | string;
+  tripCurrency?: string;
   availableCities?: string[];
   onCostChange?: () => void;
 }
 
 export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
   tripId,
+  tripCurrency,
   availableCities = [],
   onCostChange
 }) => {
-  const { formatPrice } = useCurrency();
+  const { formatPrice, convertToUsd, getSymbol } = useCurrency();
+  const activeCurrency = tripCurrency || 'USD';
 
   const storageKeyFlights = `globetrotter_flights_${tripId}`;
   const storageKeyStays = `globetrotter_stays_${tripId}`;
@@ -59,14 +62,14 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
   const [toCity, setToCity] = useState('');
   const [flightDate, setFlightDate] = useState('');
   const [flightTime, setFlightTime] = useState('08:30');
-  const [flightPrice, setFlightPrice] = useState('180');
+  const [flightPriceInput, setFlightPriceInput] = useState('180');
 
   // Stay form state
   const [hotelName, setHotelName] = useState('');
   const [stayCity, setStayCity] = useState('');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
-  const [pricePerNight, setPricePerNight] = useState('95');
+  const [pricePerNightInput, setPricePerNightInput] = useState('95');
 
   useEffect(() => {
     localStorage.setItem(storageKeyFlights, JSON.stringify(flights));
@@ -80,7 +83,6 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
 
   // Goibibo Link Builders
   const buildGoibiboFlightUrl = (flight: FlightItem) => {
-    // Format date as DDMMYYYY
     let dateFormatted = '20260915';
     if (flight.date) {
       const [y, m, d] = flight.date.split('-');
@@ -107,6 +109,9 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
     e.preventDefault();
     if (!fromCity || !toCity || !flightDate) return;
 
+    // Convert entered amount from active currency to USD base
+    const priceUsd = flightPriceInput ? convertToUsd(Number(flightPriceInput), activeCurrency) : 0;
+
     const newFlight: FlightItem = {
       id: Math.random().toString(36).substring(2, 9),
       airline: airline.trim() || 'Flight Partner',
@@ -114,7 +119,7 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
       to: toCity.trim(),
       date: flightDate,
       time: flightTime,
-      price: Number(flightPrice) || 0,
+      price: priceUsd,
     };
 
     setFlights([...flights, newFlight]);
@@ -132,13 +137,16 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
     const end = new Date(checkOut);
     const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
 
+    // Convert entered price per night from active currency to USD base
+    const pricePerNightUsd = pricePerNightInput ? convertToUsd(Number(pricePerNightInput), activeCurrency) : 0;
+
     const newStay: StayItem = {
       id: Math.random().toString(36).substring(2, 9),
       hotelName: hotelName.trim(),
       city: stayCity.trim(),
       checkIn,
       checkOut,
-      pricePerNight: Number(pricePerNight) || 0,
+      pricePerNight: pricePerNightUsd,
       totalNights: nights,
     };
 
@@ -216,7 +224,9 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
 
                   <div className="text-right">
                     <p className="text-xs text-slate-400 font-medium">Est. Price</p>
-                    <p className="text-base font-black text-blue-600">{formatPrice(flight.price)}</p>
+                    <p className="text-base font-black text-blue-600">
+                      {formatPrice(flight.price, { currency: activeCurrency })}
+                    </p>
                   </div>
                 </div>
 
@@ -289,8 +299,8 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
                   </div>
 
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 font-medium">{formatPrice(stay.pricePerNight)} / night</p>
-                    <p className="text-base font-black text-purple-600">{formatPrice(stay.pricePerNight * stay.totalNights)}</p>
+                    <p className="text-xs text-slate-400 font-medium">{formatPrice(stay.pricePerNight, { currency: activeCurrency })} / night</p>
+                    <p className="text-base font-black text-purple-600">{formatPrice(stay.pricePerNight * stay.totalNights, { currency: activeCurrency })}</p>
                   </div>
                 </div>
 
@@ -399,17 +409,20 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Estimated Price (in USD base)
+              Estimated Price ({getSymbol(activeCurrency)} {activeCurrency})
             </label>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              value={flightPrice}
-              onChange={(e) => setFlightPrice(e.target.value)}
-              placeholder="e.g. 250"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
-            />
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">{getSymbol(activeCurrency)}</span>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={flightPriceInput}
+                onChange={(e) => setFlightPriceInput(e.target.value)}
+                placeholder="e.g. 250"
+                className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -496,17 +509,20 @@ export const FlightStaySection: React.FC<FlightStaySectionProps> = ({
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Price per Night (in USD base)
+              Price per Night ({getSymbol(activeCurrency)} {activeCurrency})
             </label>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              value={pricePerNight}
-              onChange={(e) => setPricePerNight(e.target.value)}
-              placeholder="e.g. 120"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
-            />
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">{getSymbol(activeCurrency)}</span>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={pricePerNightInput}
+                onChange={(e) => setPricePerNightInput(e.target.value)}
+                placeholder="e.g. 120"
+                className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

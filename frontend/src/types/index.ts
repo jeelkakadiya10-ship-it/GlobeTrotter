@@ -5,6 +5,7 @@ export interface User {
   role: string;
   profile_photo_url?: string;
   language_pref?: string;
+  preferred_currency?: string;
   created_at?: string;
   saved_destinations?: Array<{ id: number; city: City }>;
 }
@@ -72,6 +73,8 @@ export interface Trip {
   start_date: string;
   end_date: string;
   target_budget: number | string | null;
+  display_currency?: string;
+  base_currency?: string;
   is_public: boolean;
   public_slug: string | null;
   created_at: string;
@@ -87,6 +90,8 @@ export interface Trip {
 }
 
 export interface BudgetBreakdown {
+  currency?: string;
+  base_currency?: string;
   totalCost: number;
   breakdown: {
     transport: number;
@@ -105,7 +110,7 @@ export interface BudgetBreakdown {
     name: string;
     category: string;
     amount: number;
-    date?: string;
+    date?: string | null;
     rawId: number;
   }>;
 }

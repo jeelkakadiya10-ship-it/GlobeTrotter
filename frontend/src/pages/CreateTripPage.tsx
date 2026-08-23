@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowRight, AlertCircle, Coins } from 'lucide-react';
+import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
 
 const COVER_PRESETS = [
   'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800',
@@ -12,12 +13,15 @@ const COVER_PRESETS = [
 ];
 
 export const CreateTripPage: React.FC = () => {
+  const { currency, convertToUsd, getSymbol } = useCurrency();
+
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [description, setDescription] = useState('');
   const [coverPhotoUrl, setCoverPhotoUrl] = useState(COVER_PRESETS[0]);
-  const [targetBudget, setTargetBudget] = useState('');
+  const [targetBudgetInput, setTargetBudgetInput] = useState('');
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>(currency);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -44,13 +48,19 @@ export const CreateTripPage: React.FC = () => {
 
     setLoading(true);
     try {
+      // Convert target budget entered in display currency to base USD numeric value for DB storage
+      const targetBudgetUsd = targetBudgetInput
+        ? convertToUsd(Number(targetBudgetInput), displayCurrency)
+        : null;
+
       const res = await api.post('/trips', {
         name: name.trim(),
         start_date: startDate,
         end_date: endDate,
         description: description.trim() || null,
         cover_photo_url: coverPhotoUrl,
-        target_budget: targetBudget ? Number(targetBudget) : null
+        target_budget: targetBudgetUsd,
+        display_currency: displayCurrency
       });
 
       navigate(`/trips/${res.data.id}/builder`);
@@ -65,7 +75,7 @@ export const CreateTripPage: React.FC = () => {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-black text-slate-900">Plan a New Trip</h1>
-        <p className="text-slate-500 text-sm mt-1">Set your trip dates, name, and estimated budget to get started.</p>
+        <p className="text-slate-500 text-sm mt-1">Set your trip dates, name, preferred display currency, and estimated budget.</p>
       </div>
 
       <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl">
@@ -120,19 +130,45 @@ export const CreateTripPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-              Target Budget (USD, optional)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="10"
-              value={targetBudget}
-              onChange={(e) => setTargetBudget(e.target.value)}
-              placeholder="e.g. 2500"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                Trip Display Currency
+              </label>
+              <div className="relative">
+                <select
+                  value={displayCurrency}
+                  onChange={(e) => setDisplayCurrency(e.target.value as CurrencyCode)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm cursor-pointer"
+                >
+                  {Object.values(CURRENCIES).map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} ({c.code} - {c.symbol})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                Target Budget ({getSymbol(displayCurrency)} {displayCurrency}, optional)
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-3 text-slate-400 font-bold">
+                  {getSymbol(displayCurrency)}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={targetBudgetInput}
+                  onChange={(e) => setTargetBudgetInput(e.target.value)}
+                  placeholder="e.g. 2500"
+                  className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-semibold focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm"
+                />
+              </div>
+            </div>
           </div>
 
           <div>

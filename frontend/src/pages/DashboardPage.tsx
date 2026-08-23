@@ -4,12 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import api from '../services/api';
 import { Trip, City } from '../types';
-import { PlusCircle, Calendar, MapPin, DollarSign, ArrowRight, Sparkles, Compass } from 'lucide-react';
+import { PlusCircle, Calendar, MapPin, DollarSign, ArrowRight, Sparkles, Compass, Coins } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, currency, getSymbol } = useCurrency();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [recommendedCities, setRecommendedCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,10 +85,10 @@ export const DashboardPage: React.FC = () => {
 
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-            <DollarSign className="w-6 h-6" />
+            <Coins className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Target Spend (Total)</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Target Spend ({currency})</p>
             <p className="text-2xl font-black text-slate-900">{formatPrice(totalPlannedSpend)}</p>
           </div>
         </div>
@@ -117,57 +117,60 @@ export const DashboardPage: React.FC = () => {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {trips.slice(0, 3).map((trip) => (
-              <div
-                key={trip.id}
-                className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
-              >
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={trip.cover_photo_url || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800'}
-                    alt={trip.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                  <div className="absolute bottom-3 left-4 right-4 text-white">
-                    <h3 className="text-lg font-bold truncate">{trip.name}</h3>
-                    <p className="text-xs text-slate-200 flex items-center gap-1.5 mt-0.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formatDateRange(trip.start_date, trip.end_date)}
-                    </p>
+            {trips.slice(0, 3).map((trip) => {
+              const tripCurrency = trip.display_currency || 'USD';
+              return (
+                <div
+                  key={trip.id}
+                  className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={trip.cover_photo_url || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800'}
+                      alt={trip.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                    <div className="absolute bottom-3 left-4 right-4 text-white">
+                      <h3 className="text-lg font-bold truncate">{trip.name}</h3>
+                      <p className="text-xs text-slate-200 flex items-center gap-1.5 mt-0.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {formatDateRange(trip.start_date, trip.end_date)}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span className="flex items-center gap-1 font-semibold">
-                      <MapPin className="w-3.5 h-3.5 text-brand-600" />
-                      {trip.stops?.length || 0} {(trip.stops?.length || 0) === 1 ? 'City' : 'Cities'}
-                    </span>
-                    {trip.target_budget && (
-                      <span className="font-bold text-slate-800">
-                        Budget: {formatPrice(trip.target_budget)}
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span className="flex items-center gap-1 font-semibold">
+                        <MapPin className="w-3.5 h-3.5 text-brand-600" />
+                        {trip.stops?.length || 0} {(trip.stops?.length || 0) === 1 ? 'City' : 'Cities'}
                       </span>
-                    )}
-                  </div>
+                      {trip.target_budget && (
+                        <span className="font-bold text-slate-800">
+                          Budget: {formatPrice(trip.target_budget, { currency: tripCurrency })}
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                    <Link
-                      to={`/trips/${trip.id}/view`}
-                      className="text-center py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
-                    >
-                      View
-                    </Link>
-                    <Link
-                      to={`/trips/${trip.id}/builder`}
-                      className="text-center py-2 px-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-sm transition-colors"
-                    >
-                      Edit Plan
-                    </Link>
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <Link
+                        to={`/trips/${trip.id}/view`}
+                        className="text-center py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                      >
+                        View
+                      </Link>
+                      <Link
+                        to={`/trips/${trip.id}/builder`}
+                        className="text-center py-2 px-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-sm transition-colors"
+                      >
+                        Edit Plan
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -200,7 +203,7 @@ export const DashboardPage: React.FC = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent"></div>
               <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/50 backdrop-blur-md rounded-full text-[10px] font-bold text-white">
-                {'$'.repeat(city.cost_index || 2)}
+                {getSymbol(currency).repeat(city.cost_index || 2)}
               </div>
               <div className="absolute bottom-3 left-3 right-3 text-white">
                 <h4 className="font-bold text-sm leading-tight truncate">{city.name}</h4>

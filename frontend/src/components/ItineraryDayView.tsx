@@ -20,6 +20,7 @@ interface DayPlan {
 
 export const ItineraryDayView: React.FC<ItineraryDayViewProps> = ({ trip }) => {
   const { formatPrice } = useCurrency();
+  const activeCurrency = trip.display_currency || 'USD';
 
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem('globetrotter_itinerary_view_mode');
@@ -65,7 +66,6 @@ export const ItineraryDayView: React.FC<ItineraryDayViewProps> = ({ trip }) => {
             dayActivities.push(ta);
           }
         } else {
-          // If unscheduled, distribute evenly
           dayActivities.push(ta);
         }
       });
@@ -87,7 +87,7 @@ export const ItineraryDayView: React.FC<ItineraryDayViewProps> = ({ trip }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Day-by-Day Itinerary</h2>
-          <p className="text-xs text-slate-500">{totalDays} days across {stops.length} destinations</p>
+          <p className="text-xs text-slate-500">{totalDays} days across {stops.length} destinations ({activeCurrency})</p>
         </div>
 
         {/* View Switcher Tabs */}
@@ -175,7 +175,7 @@ export const ItineraryDayView: React.FC<ItineraryDayViewProps> = ({ trip }) => {
                             {ta.activity.category}
                           </span>
                           <span className="text-xs font-black text-emerald-600">
-                            {formatPrice(ta.cost_override ?? ta.activity.estimated_cost)}
+                            {formatPrice(ta.cost_override ?? ta.activity.estimated_cost, { currency: activeCurrency })}
                           </span>
                         </div>
                         <h4 className="text-sm font-bold text-slate-900 leading-tight truncate">
@@ -245,7 +245,7 @@ export const ItineraryDayView: React.FC<ItineraryDayViewProps> = ({ trip }) => {
                           </div>
                         </div>
                         <span className="text-xs font-black text-emerald-600 flex-shrink-0">
-                          {formatPrice(ta.cost_override ?? ta.activity.estimated_cost)}
+                          {formatPrice(ta.cost_override ?? ta.activity.estimated_cost, { currency: activeCurrency })}
                         </span>
                       </div>
                     ))}
@@ -283,7 +283,7 @@ export const ItineraryDayView: React.FC<ItineraryDayViewProps> = ({ trip }) => {
                       <div key={ta.id} className="p-2 bg-slate-50 rounded-xl flex items-center justify-between text-xs">
                         <span className="font-semibold text-slate-800 truncate pr-2">{ta.activity.name}</span>
                         <span className="font-bold text-emerald-600 flex-shrink-0">
-                          {formatPrice(ta.cost_override ?? ta.activity.estimated_cost)}
+                          {formatPrice(ta.cost_override ?? ta.activity.estimated_cost, { currency: activeCurrency })}
                         </span>
                       </div>
                     ))

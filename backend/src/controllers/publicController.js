@@ -6,11 +6,8 @@ export const getPublicTrip = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const trip = await prisma.trip.findFirst({
-      where: {
-        public_slug: slug,
-        is_public: true
-      },
+    const trip = await prisma.trip.findUnique({
+      where: { public_slug: slug },
       include: {
         user: {
           select: {
@@ -23,11 +20,9 @@ export const getPublicTrip = async (req, res) => {
           include: {
             city: true,
             trip_activities: {
-              include: { activity: true },
-              orderBy: [
-                { scheduled_date: 'asc' },
-                { scheduled_time: 'asc' }
-              ]
+              include: {
+                activity: true
+              }
             }
           }
         },
@@ -35,15 +30,17 @@ export const getPublicTrip = async (req, res) => {
       }
     });
 
-    if (!trip) {
-      return res.status(404).json({
-        error: 'This trip is private or does not exist.'
-      });
+    if (!trip || !trip.is_public) {
+      return res.status(404).json({ error: 'Itinerary not found or is set to private' });
     }
 
-    return res.json(trip);
-  } catch (err) {
-    console.error('Get public trip error:', err);
-    return res.status(500).json({ error: 'Failed to load public trip' });
+    res.json({
+      ...trip,
+      display_currency: trip.display_currency || 'USD',
+      base_currency: 'USD'
+    });
+  } catch (error) {
+    console.error('getPublicTrip error:', error);
+    res.status(500).json({ error: 'Failed to load public trip' });
   }
 };

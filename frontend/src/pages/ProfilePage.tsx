@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
 import api from '../services/api';
 import { User, City } from '../types';
-import { User as UserIcon, Mail, Globe, Trash2, Bookmark, AlertTriangle, Check, Shield } from 'lucide-react';
+import { User as UserIcon, Mail, Globe, Trash2, Bookmark, AlertTriangle, Check, Shield, Coins } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export const ProfilePage: React.FC = () => {
   const { user, updateUser, deleteAccount } = useAuth();
+  const { setCurrency } = useCurrency();
+
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [photoUrl, setPhotoUrl] = useState(user?.profile_photo_url || '');
   const [languagePref, setLanguagePref] = useState(user?.language_pref || 'en');
+  const [preferredCurrency, setPreferredCurrency] = useState<CurrencyCode>(
+    (user?.preferred_currency as CurrencyCode) || 'USD'
+  );
   const [newPassword, setNewPassword] = useState('');
   const [savedCities, setSavedCities] = useState<Array<{ id: number; city: City }>>([]);
   const [saving, setSaving] = useState(false);
@@ -30,6 +36,9 @@ export const ProfilePage: React.FC = () => {
         setEmail(res.data.email);
         setPhotoUrl(res.data.profile_photo_url || '');
         setLanguagePref(res.data.language_pref || 'en');
+        if (res.data.preferred_currency && res.data.preferred_currency in CURRENCIES) {
+          setPreferredCurrency(res.data.preferred_currency as CurrencyCode);
+        }
         setSavedCities(res.data.saved_destinations || []);
       } catch (err) {
         console.error('Failed to load profile:', err);
@@ -47,12 +56,14 @@ export const ProfilePage: React.FC = () => {
         name,
         email,
         profile_photo_url: photoUrl,
-        language_pref: languagePref
+        language_pref: languagePref,
+        preferred_currency: preferredCurrency,
       };
       if (newPassword) payload.password = newPassword;
 
       const res = await api.patch('/users/me', payload);
       updateUser(res.data);
+      setCurrency(preferredCurrency);
       setNewPassword('');
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -89,13 +100,13 @@ export const ProfilePage: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-10">
       <div>
         <h1 className="text-3xl font-black text-slate-900">User Profile & Settings</h1>
-        <p className="text-slate-500 text-sm mt-1">Manage your account preferences and saved destinations.</p>
+        <p className="text-slate-500 text-sm mt-1">Manage your account preferences, default currency, and saved destinations.</p>
       </div>
 
       {saveSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm animate-fadeIn">
           <Check className="w-5 h-5 text-emerald-600" />
-          <span>Profile updated successfully!</span>
+          <span>Profile and default currency updated successfully!</span>
         </div>
       )}
 
@@ -132,7 +143,7 @@ export const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                 Profile Photo URL
@@ -160,6 +171,24 @@ export const ProfilePage: React.FC = () => {
                 <option value="fr">Français</option>
                 <option value="de">Deutsch</option>
                 <option value="ja">日本語</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1">
+                <Coins className="w-3.5 h-3.5 text-brand-600" />
+                Preferred Currency (Profile Default)
+              </label>
+              <select
+                value={preferredCurrency}
+                onChange={(e) => setPreferredCurrency(e.target.value as CurrencyCode)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer"
+              >
+                {Object.values(CURRENCIES).map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.code} - {c.symbol})
+                  </option>
+                ))}
               </select>
             </div>
           </div>

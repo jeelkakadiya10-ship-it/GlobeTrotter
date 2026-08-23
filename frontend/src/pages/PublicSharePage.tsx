@@ -88,6 +88,7 @@ export const PublicSharePage: React.FC = () => {
     );
   }
 
+  const activeTripCurrency = trip.display_currency || 'USD';
   const pageUrl = encodeURIComponent(window.location.href);
   const shareText = encodeURIComponent(`Check out my trip itinerary for "${trip.name}" on GlobeTrotter! ✈️🌍`);
 
@@ -107,6 +108,9 @@ export const PublicSharePage: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="px-3 py-1 bg-emerald-500/80 backdrop-blur-md rounded-full text-xs font-black uppercase tracking-wider text-white">
                 Public Shared Itinerary
+              </span>
+              <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold text-white">
+                Currency: {activeTripCurrency}
               </span>
               <span className="text-xs text-slate-300 font-semibold">
                 By {trip.user?.name || 'Fellow Traveler'}

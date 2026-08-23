@@ -7,63 +7,65 @@ const JWT_SECRET = process.env.JWT_SECRET || 'globetrotter-super-secret-jwt-key-
 
 export const signup = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, preferred_currency } = req.body;
+
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
 
-    const existingUser = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: 'Email is already registered' });
+      return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     const password_hash = await bcrypt.hash(password, 10);
+
     const user = await prisma.user.create({
       data: {
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
+        name,
+        email,
         password_hash,
-        role: 'user',
-        language_pref: 'en'
+        preferred_currency: preferred_currency || 'USD'
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profile_photo_url: true,
+        language_pref: true,
+        preferred_currency: true
       }
     });
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-    return res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profile_photo_url: user.profile_photo_url,
-        language_pref: user.language_pref
-      }
-    });
-  } catch (err) {
-    console.error('Signup error:', err);
-    return res.status(500).json({ error: 'Internal server error during signup' });
+    res.status(201).json({ user, token });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ error: 'Failed to create account' });
   }
 };
 
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     if (user.is_disabled) {
-      return res.status(403).json({ error: 'Your account has been disabled. Please contact support.' });
+      return res.status(403).json({ error: 'Your account has been deactivated. Please contact support.' });
     }
 
     const isValid = await bcrypt.compare(password, user.password_hash);
@@ -71,22 +73,26 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-    return res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profile_photo_url: user.profile_photo_url,
-        language_pref: user.language_pref
-      }
-    });
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Internal server error during login' });
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profile_photo_url: user.profile_photo_url,
+      language_pref: user.language_pref,
+      preferred_currency: user.preferred_currency || 'USD'
+    };
+
+    res.json({ user: userResponse, token });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Failed to authenticate user' });
   }
 };
 
@@ -97,14 +103,9 @@ export const forgotPassword = async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-    // Safe response matching v1 spec
-    return res.json({
-      message: user
-        ? 'Password reset instructions have been sent to your email address (simulated in v1 demo).'
-        : 'If that email exists in our system, a password reset link has been sent.'
-    });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to process request' });
+    res.json({ message: 'If that email address exists in our database, a password reset link has been dispatched.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to process request' });
   }
 };

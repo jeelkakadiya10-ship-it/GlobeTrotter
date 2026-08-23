@@ -16,10 +16,10 @@ export const TripCalendarPage: React.FC = () => {
   const [selectedActivity, setSelectedActivity] = useState<TripActivity | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
-  const [editCost, setEditCost] = useState('');
+  const [editCostInput, setEditCostInput] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const { formatPrice } = useCurrency();
+  const { formatPrice, convertPrice, convertToUsd, getSymbol } = useCurrency();
 
   const fetchTrip = async () => {
     try {
@@ -36,11 +36,19 @@ export const TripCalendarPage: React.FC = () => {
     fetchTrip();
   }, [id]);
 
+  const activeTripCurrency = trip?.display_currency || 'USD';
+  const currencySymbol = getSymbol(activeTripCurrency);
+
   const handleOpenEdit = (ta: TripActivity) => {
     setSelectedActivity(ta);
     setEditDate(ta.scheduled_date ? ta.scheduled_date.split('T')[0] : '');
     setEditTime(ta.scheduled_time || '10:00');
-    setEditCost(ta.cost_override !== null ? String(ta.cost_override) : '');
+    if (ta.cost_override !== null && ta.cost_override !== undefined) {
+      const converted = convertPrice(ta.cost_override, activeTripCurrency);
+      setEditCostInput(String(Math.round(converted * 100) / 100));
+    } else {
+      setEditCostInput('');
+    }
     setEditModalOpen(true);
   };
 
@@ -49,10 +57,14 @@ export const TripCalendarPage: React.FC = () => {
     if (!selectedActivity) return;
     setSavingEdit(true);
     try {
+      const costOverrideUsd = editCostInput
+        ? convertToUsd(Number(editCostInput), activeTripCurrency)
+        : null;
+
       await api.patch(`/trip-activities/${selectedActivity.id}`, {
         scheduled_date: editDate || null,
         scheduled_time: editTime || null,
-        cost_override: editCost ? Number(editCost) : null
+        cost_override: costOverrideUsd
       });
       setEditModalOpen(false);
       fetchTrip();
@@ -89,7 +101,7 @@ export const TripCalendarPage: React.FC = () => {
           </Link>
           <div>
             <h1 className="text-3xl font-black text-slate-900">Trip Calendar & Timeline</h1>
-            <p className="text-slate-500 text-sm">{trip.name} • {new Date(trip.start_date).toLocaleDateString()} to {new Date(trip.end_date).toLocaleDateString()}</p>
+            <p className="text-slate-500 text-sm">{trip.name} • {new Date(trip.start_date).toLocaleDateString()} to {new Date(trip.end_date).toLocaleDateString()} ({activeTripCurrency})</p>
           </div>
         </div>
 
@@ -121,7 +133,7 @@ export const TripCalendarPage: React.FC = () => {
               <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200/60">
                 <span>{ta.activity.estimated_duration_mins} mins</span>
                 <span className="font-bold text-emerald-600">
-                  {formatPrice(ta.cost_override ?? ta.activity.estimated_cost)}
+                  {formatPrice(ta.cost_override ?? ta.activity.estimated_cost, { currency: activeTripCurrency })}
                 </span>
               </div>
             </div>
@@ -169,16 +181,22 @@ export const TripCalendarPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Cost Override (in USD base)
+              Cost Override ({currencySymbol} {activeTripCurrency})
             </label>
-            <input
-              type="number"
-              step="0.01"
-              value={editCost}
-              onChange={(e) => setEditCost(e.target.value)}
-              placeholder={`Default: $${Number(selectedActivity?.activity.estimated_cost).toFixed(2)}`}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
-            />
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">{currencySymbol}</span>
+              <input
+                type="number"
+                step="0.01"
+                value={editCostInput}
+                onChange={(e) => setEditCostInput(e.target.value)}
+                placeholder={`Default: ${formatPrice(selectedActivity?.activity.estimated_cost, { currency: activeTripCurrency })}`}
+                className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Entered in {activeTripCurrency}, stored in USD base (~${editCostInput ? convertToUsd(Number(editCostInput), activeTripCurrency).toFixed(2) : '0.00'} USD)
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

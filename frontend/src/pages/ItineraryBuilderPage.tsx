@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Trip, Stop, Activity } from '../types';
-import { Calendar, MapPin, Plus, Trash2, ArrowUp, ArrowDown, Search, Eye, PieChart, Clock, DollarSign, GripVertical, AlertCircle, Save } from 'lucide-react';
+import { Calendar, MapPin, Plus, Trash2, ArrowUp, ArrowDown, Search, Eye, PieChart, Clock, DollarSign, GripVertical, AlertCircle, Save, Coins } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
 import { FlightStaySection } from '../components/FlightStaySection';
 import { SaveTripButton } from '../components/SaveTripButton';
-import { useCurrency } from '../context/CurrencyContext';
+import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
 
 export const ItineraryBuilderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +19,7 @@ export const ItineraryBuilderPage: React.FC = () => {
   const [tripName, setTripName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('USD');
 
   // Delete stop modal state
   const [deleteStopModalOpen, setDeleteStopModalOpen] = useState(false);
@@ -30,7 +31,7 @@ export const ItineraryBuilderPage: React.FC = () => {
   const [cityActivities, setCityActivities] = useState<Activity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
 
-  const { formatPrice } = useCurrency();
+  const { formatPrice, getSymbol } = useCurrency();
   const navigate = useNavigate();
 
   const fetchTrip = async () => {
@@ -40,6 +41,9 @@ export const ItineraryBuilderPage: React.FC = () => {
       setTripName(res.data.name);
       setStartDate(res.data.start_date.split('T')[0]);
       setEndDate(res.data.end_date.split('T')[0]);
+      if (res.data.display_currency && res.data.display_currency in CURRENCIES) {
+        setDisplayCurrency(res.data.display_currency as CurrencyCode);
+      }
     } catch (err) {
       console.error('Failed to load trip builder:', err);
     } finally {
@@ -51,15 +55,18 @@ export const ItineraryBuilderPage: React.FC = () => {
     fetchTrip();
   }, [id]);
 
-  const handleUpdateTripHeader = async () => {
+  const handleUpdateTripHeader = async (newCurrency?: CurrencyCode) => {
     if (!trip) return;
     setSavingTrip(true);
     try {
+      const updatedCurrency = newCurrency || displayCurrency;
       await api.patch(`/trips/${trip.id}`, {
         name: tripName,
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
+        display_currency: updatedCurrency
       });
+      if (newCurrency) setDisplayCurrency(newCurrency);
       fetchTrip();
     } catch (err) {
       console.error(err);
@@ -156,6 +163,7 @@ export const ItineraryBuilderPage: React.FC = () => {
   }
 
   const stopCityNames = (trip.stops || []).map((s) => s.city?.name).filter(Boolean);
+  const activeTripCurrency = trip.display_currency || displayCurrency || 'USD';
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
@@ -167,7 +175,7 @@ export const ItineraryBuilderPage: React.FC = () => {
               type="text"
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
-              onBlur={handleUpdateTripHeader}
+              onBlur={() => handleUpdateTripHeader()}
               className="text-2xl sm:text-3xl font-black text-slate-900 w-full border-b border-transparent hover:border-slate-300 focus:border-brand-500 focus:outline-none transition-colors"
             />
             <div className="flex flex-wrap items-center gap-3">
@@ -177,7 +185,7 @@ export const ItineraryBuilderPage: React.FC = () => {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  onBlur={handleUpdateTripHeader}
+                  onBlur={() => handleUpdateTripHeader()}
                   className="bg-transparent focus:outline-none"
                 />
                 <span>to</span>
@@ -185,10 +193,31 @@ export const ItineraryBuilderPage: React.FC = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  onBlur={handleUpdateTripHeader}
+                  onBlur={() => handleUpdateTripHeader()}
                   min={startDate}
                   className="bg-transparent focus:outline-none"
                 />
+              </div>
+
+              {/* Per-trip currency selector */}
+              <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+                <Coins className="w-3.5 h-3.5 text-brand-600" />
+                <span>Trip Currency:</span>
+                <select
+                  value={displayCurrency}
+                  onChange={(e) => {
+                    const newC = e.target.value as CurrencyCode;
+                    setDisplayCurrency(newC);
+                    handleUpdateTripHeader(newC);
+                  }}
+                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                >
+                  {Object.values(CURRENCIES).map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} ({c.symbol})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -293,7 +322,9 @@ export const ItineraryBuilderPage: React.FC = () => {
                     <div className="flex items-center gap-3 self-end sm:self-center">
                       <div className="text-right">
                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Stop Cost</p>
-                        <p className="text-base font-black text-emerald-600">{formatPrice(subtotal)}</p>
+                        <p className="text-base font-black text-emerald-600">
+                          {formatPrice(subtotal, { currency: activeTripCurrency })}
+                        </p>
                       </div>
 
                       <button
@@ -348,7 +379,7 @@ export const ItineraryBuilderPage: React.FC = () => {
                                   </span>
                                   <span>•</span>
                                   <span className="font-bold text-emerald-600">
-                                    {formatPrice(ta.cost_override ?? ta.activity.estimated_cost)}
+                                    {formatPrice(ta.cost_override ?? ta.activity.estimated_cost, { currency: activeTripCurrency })}
                                   </span>
                                 </div>
                               </div>
@@ -377,7 +408,7 @@ export const ItineraryBuilderPage: React.FC = () => {
       </div>
 
       {/* Flights & Stays Section */}
-      <FlightStaySection tripId={trip.id} availableCities={stopCityNames} />
+      <FlightStaySection tripId={trip.id} tripCurrency={activeTripCurrency} availableCities={stopCityNames} />
 
       {/* Delete Stop Modal */}
       <Modal
@@ -438,7 +469,9 @@ export const ItineraryBuilderPage: React.FC = () => {
                         <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold uppercase">
                           {act.category}
                         </span>
-                        <span className="text-xs font-bold text-emerald-600">{formatPrice(act.estimated_cost)}</span>
+                        <span className="text-xs font-bold text-emerald-600">
+                          {formatPrice(act.estimated_cost, { currency: activeTripCurrency })}
+                        </span>
                       </div>
                       <h4 className="text-sm font-bold text-slate-900 leading-tight">{act.name}</h4>
                       <p className="text-xs text-slate-500 line-clamp-1">{act.description}</p>

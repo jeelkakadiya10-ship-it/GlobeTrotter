@@ -12,11 +12,11 @@ export const ActivitySearchPage: React.FC = () => {
   const [city, setCity] = useState<City | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [category, setCategory] = useState('all');
-  const [maxCost, setMaxCost] = useState<number>(200);
+  const [maxCostUsd, setMaxCostUsd] = useState<number>(200);
   const [maxDuration, setMaxDuration] = useState<number>(480);
   const [loading, setLoading] = useState(true);
 
-  const { formatPrice } = useCurrency();
+  const { formatPrice, currency, convertPrice, getSymbol } = useCurrency();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export const ActivitySearchPage: React.FC = () => {
           api.get(`/cities/${id}/activities`, {
             params: {
               category,
-              maxCost,
+              maxCost: maxCostUsd,
               maxDuration
             }
           })
@@ -44,7 +44,7 @@ export const ActivitySearchPage: React.FC = () => {
     };
 
     fetchCityAndActivities();
-  }, [id, category, maxCost, maxDuration]);
+  }, [id, category, maxCostUsd, maxDuration]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -88,15 +88,15 @@ export const ActivitySearchPage: React.FC = () => {
           <div>
             <div className="flex justify-between text-xs font-bold text-slate-700 mb-2">
               <span>Max Budget per Person:</span>
-              <span className="text-brand-600 font-extrabold">{formatPrice(maxCost)}</span>
+              <span className="text-brand-600 font-extrabold">{formatPrice(maxCostUsd)}</span>
             </div>
             <input
               type="range"
               min="0"
-              max="200"
+              max="300"
               step="5"
-              value={maxCost}
-              onChange={(e) => setMaxCost(Number(e.target.value))}
+              value={maxCostUsd}
+              onChange={(e) => setMaxCostUsd(Number(e.target.value))}
               className="w-full accent-brand-500"
             />
           </div>

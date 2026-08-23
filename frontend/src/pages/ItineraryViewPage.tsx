@@ -76,6 +76,7 @@ export const ItineraryViewPage: React.FC = () => {
 
   const shareUrl = trip.public_slug ? `${window.location.origin}/share/${trip.public_slug}` : '';
   const stopCityNames = (trip.stops || []).map((s) => s.city?.name).filter(Boolean);
+  const tripCurrency = trip.display_currency || 'USD';
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
@@ -94,9 +95,12 @@ export const ItineraryViewPage: React.FC = () => {
               <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-extrabold uppercase tracking-wider text-teal-200">
                 Itinerary Review
               </span>
+              <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold text-white">
+                Currency: {tripCurrency}
+              </span>
               {trip.target_budget && (
                 <span className="px-3 py-1 bg-emerald-500/80 backdrop-blur-md rounded-full text-xs font-black text-white">
-                  Target: {formatPrice(trip.target_budget)}
+                  Target: {formatPrice(trip.target_budget, { currency: tripCurrency })}
                 </span>
               )}
             </div>
@@ -145,7 +149,7 @@ export const ItineraryViewPage: React.FC = () => {
       <ItineraryDayView trip={trip} />
 
       {/* Flights & Stays Section with Goibibo booking links */}
-      <FlightStaySection tripId={trip.id} availableCities={stopCityNames} />
+      <FlightStaySection tripId={trip.id} tripCurrency={tripCurrency} availableCities={stopCityNames} />
 
       {/* Share Modal */}
       <Modal

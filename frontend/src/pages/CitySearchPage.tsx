@@ -4,6 +4,7 @@ import api from '../services/api';
 import { City, Trip } from '../types';
 import { Search, MapPin, Sparkles, Plus, Bookmark, Check, ArrowRight } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { useCurrency } from '../context/CurrencyContext';
 
 const REGIONS = ['All', 'Europe', 'Asia', 'North America', 'South America', 'Middle East', 'Africa', 'Oceania'];
 
@@ -24,6 +25,7 @@ export const CitySearchPage: React.FC = () => {
   const [targetTripId, setTargetTripId] = useState<string>(tripIdParam || '');
   const [addingLoading, setAddingLoading] = useState(false);
 
+  const { currency, getSymbol } = useCurrency();
   const navigate = useNavigate();
 
   const fetchCities = async () => {
@@ -83,13 +85,10 @@ export const CitySearchPage: React.FC = () => {
     }
   };
 
-  const handleToggleBookmark = async (city: City) => {
-    try {
-      await api.post('/users/save-city', { cityId: city.id });
-      // update local
-    } catch (err) {
-      console.error(err);
-    }
+  const getCostIndexLabel = (costIndex: number | null) => {
+    const symbol = getSymbol(currency);
+    const count = costIndex || 2;
+    return symbol.repeat(count);
   };
 
   return (
@@ -158,7 +157,7 @@ export const CitySearchPage: React.FC = () => {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
                 <div className="absolute top-3 right-3 px-2.5 py-1 bg-black/40 backdrop-blur-md rounded-full text-xs font-bold text-white">
-                  {'$'.repeat(city.cost_index || 2)}
+                  {getCostIndexLabel(city.cost_index)}
                 </div>
                 <div className="absolute bottom-3 left-4 right-4 text-white">
                   <h3 className="text-lg font-bold leading-tight">{city.name}</h3>
@@ -233,7 +232,7 @@ export const CitySearchPage: React.FC = () => {
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 {trips.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                  <option key={t.id} value={t.id}>{t.name} ({t.display_currency || 'USD'})</option>
                 ))}
               </select>
             </div>

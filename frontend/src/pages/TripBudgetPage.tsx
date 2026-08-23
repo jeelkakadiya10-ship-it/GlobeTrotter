@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { BudgetBreakdown, Trip } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { DollarSign, Plus, Trash2, AlertTriangle, ArrowLeft, TrendingUp, Calendar, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Plus, Trash2, AlertTriangle, ArrowLeft, TrendingUp, Calendar, CheckCircle2, Info } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { useCurrency } from '../context/CurrencyContext';
 import { FlightItem, StayItem } from '../components/FlightStaySection';
@@ -26,11 +26,11 @@ export const TripBudgetPage: React.FC = () => {
   // Add Expense modal state
   const [addExpenseModalOpen, setAddExpenseModalOpen] = useState(false);
   const [expenseCategory, setExpenseCategory] = useState('transport');
-  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseAmountInput, setExpenseAmountInput] = useState('');
   const [expenseNote, setExpenseNote] = useState('');
   const [expenseLoading, setExpenseLoading] = useState(false);
 
-  const { formatPrice, convertPrice, currencyConfig } = useCurrency();
+  const { formatPrice, convertPrice, convertToUsd, getSymbol, ratesLastUpdated } = useCurrency();
 
   const fetchBudgetAndTrip = async () => {
     try {
@@ -40,7 +40,9 @@ export const TripBudgetPage: React.FC = () => {
       ]);
       setTrip(tripRes.data);
 
-      // Also merge local flights and stays into breakdown if present
+      const activeTripCurrency = tripRes.data.display_currency || 'USD';
+
+      // Merge local flights and stays into breakdown if present
       const flightsRaw = localStorage.getItem(`globetrotter_flights_${id}`);
       const staysRaw = localStorage.getItem(`globetrotter_stays_${id}`);
       const localFlights: FlightItem[] = flightsRaw ? JSON.parse(flightsRaw) : [];
@@ -84,7 +86,14 @@ export const TripBudgetPage: React.FC = () => {
       initialBudget.isOverBudget = initialBudget.targetBudget !== null && initialBudget.totalCost > initialBudget.targetBudget;
 
       setBudgetData(initialBudget);
-      setTargetBudgetInput(tripRes.data.target_budget ? String(tripRes.data.target_budget) : '');
+
+      // Target budget input initialized in trip display currency
+      if (tripRes.data.target_budget) {
+        const convertedTarget = convertPrice(tripRes.data.target_budget, activeTripCurrency);
+        setTargetBudgetInput(String(Math.round(convertedTarget * 100) / 100));
+      } else {
+        setTargetBudgetInput('');
+      }
     } catch (err) {
       console.error('Failed to load budget:', err);
     } finally {
@@ -99,8 +108,13 @@ export const TripBudgetPage: React.FC = () => {
   const handleUpdateTargetBudget = async () => {
     if (!trip) return;
     try {
+      const activeTripCurrency = trip.display_currency || 'USD';
+      const budgetUsd = targetBudgetInput
+        ? convertToUsd(Number(targetBudgetInput), activeTripCurrency)
+        : null;
+
       await api.patch(`/trips/${trip.id}`, {
-        target_budget: targetBudgetInput ? Number(targetBudgetInput) : null
+        target_budget: budgetUsd
       });
       fetchBudgetAndTrip();
     } catch (err) {
@@ -110,17 +124,20 @@ export const TripBudgetPage: React.FC = () => {
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expenseAmount || isNaN(Number(expenseAmount))) return;
+    if (!expenseAmountInput || isNaN(Number(expenseAmountInput))) return;
 
     setExpenseLoading(true);
     try {
+      const activeTripCurrency = trip?.display_currency || 'USD';
+      const amountUsd = convertToUsd(Number(expenseAmountInput), activeTripCurrency);
+
       await api.post(`/trips/${id}/budget-entries`, {
         category: expenseCategory,
-        amount: Number(expenseAmount),
+        amount: amountUsd,
         note: expenseNote
       });
       setAddExpenseModalOpen(false);
-      setExpenseAmount('');
+      setExpenseAmountInput('');
       setExpenseNote('');
       fetchBudgetAndTrip();
     } catch (err) {
@@ -151,11 +168,14 @@ export const TripBudgetPage: React.FC = () => {
     return <div className="p-8 text-center text-slate-500">Trip budget data not available.</div>;
   }
 
+  const activeTripCurrency = trip.display_currency || 'USD';
+  const currencySymbol = getSymbol(activeTripCurrency);
+
   const chartData = Object.entries(budgetData.breakdown)
     .filter(([_, value]) => value > 0)
     .map(([name, value]) => ({
       name: name.charAt(0).toUpperCase() + name.slice(1),
-      value: convertPrice(value),
+      value: convertPrice(value, activeTripCurrency),
       color: CATEGORY_COLORS[name] || '#64748b'
     }));
 
@@ -172,7 +192,7 @@ export const TripBudgetPage: React.FC = () => {
           </Link>
           <div>
             <h1 className="text-3xl font-black text-slate-900">Trip Budget & Cost Breakdown</h1>
-            <p className="text-slate-500 text-sm">{trip.name}</p>
+            <p className="text-slate-500 text-sm">{trip.name} • Display Currency: <span className="font-bold text-slate-800">{activeTripCurrency} ({currencySymbol})</span></p>
           </div>
         </div>
 
@@ -194,7 +214,7 @@ export const TripBudgetPage: React.FC = () => {
           <div>
             <h3 className="font-extrabold text-base">Budget Warning: Over Planned Limit</h3>
             <p className="text-xs text-red-700 mt-0.5">
-              Current total ({formatPrice(budgetData.totalCost)}) exceeds your target budget ({formatPrice(budgetData.targetBudget)}) by {formatPrice(budgetData.totalCost - (budgetData.targetBudget || 0))}.
+              Current total ({formatPrice(budgetData.totalCost, { currency: activeTripCurrency })}) exceeds your target budget ({formatPrice(budgetData.targetBudget, { currency: activeTripCurrency })}) by {formatPrice(budgetData.totalCost - (budgetData.targetBudget || 0), { currency: activeTripCurrency })}.
             </p>
           </div>
         </div>
@@ -204,20 +224,26 @@ export const TripBudgetPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-1">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Estimated Cost</span>
-          <p className="text-3xl font-black text-slate-900">{formatPrice(budgetData.totalCost)}</p>
+          <p className="text-3xl font-black text-slate-900">
+            {formatPrice(budgetData.totalCost, { currency: activeTripCurrency })}
+          </p>
           <p className="text-xs text-slate-400">Includes flights, stays, activities & expenses</p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-1">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Average Cost / Day</span>
-          <p className="text-3xl font-black text-brand-600">{formatPrice(budgetData.avgCostPerDay)}</p>
+          <p className="text-3xl font-black text-brand-600">
+            {formatPrice(budgetData.avgCostPerDay, { currency: activeTripCurrency })}
+          </p>
           <p className="text-xs text-slate-400">Across {budgetData.days} days duration</p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Target Budget (USD)</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Target Budget ({currencySymbol} {activeTripCurrency})
+          </span>
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-bold">$</span>
+            <span className="text-slate-400 font-bold">{currencySymbol}</span>
             <input
               type="number"
               value={targetBudgetInput}
@@ -228,7 +254,7 @@ export const TripBudgetPage: React.FC = () => {
             />
           </div>
           <p className="text-[11px] text-slate-400">
-            {targetBudgetInput ? `Converted: ${formatPrice(Number(targetBudgetInput))}` : 'Auto-saves on blur'}
+            Stored in base USD: {trip.target_budget ? `$${Number(trip.target_budget).toFixed(2)} USD` : 'None'} • Auto-saves on blur
           </p>
         </div>
       </div>
@@ -237,7 +263,7 @@ export const TripBudgetPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Category breakdown visual */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6 flex flex-col justify-between">
-          <h2 className="text-xl font-bold text-slate-900">Spending by Category ({currencyConfig.code})</h2>
+          <h2 className="text-xl font-bold text-slate-900">Spending by Category ({activeTripCurrency})</h2>
 
           {chartData.length === 0 ? (
             <div className="py-16 text-center text-slate-400 text-sm">No expenses recorded yet.</div>
@@ -258,7 +284,7 @@ export const TripBudgetPage: React.FC = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => `${currencyConfig.symbol}${Number(value).toLocaleString()}`} />
+                  <Tooltip formatter={(value) => `${currencySymbol}${Number(value).toLocaleString()}`} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -272,7 +298,9 @@ export const TripBudgetPage: React.FC = () => {
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[category] }}></span>
                   <span className="text-xs font-bold uppercase text-slate-600">{category}</span>
                 </div>
-                <p className="text-sm font-black text-slate-900">{formatPrice(amount)}</p>
+                <p className="text-sm font-black text-slate-900">
+                  {formatPrice(amount, { currency: activeTripCurrency })}
+                </p>
               </div>
             ))}
           </div>
@@ -302,7 +330,9 @@ export const TripBudgetPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="text-sm font-black text-slate-900">{formatPrice(item.amount)}</span>
+                  <span className="text-sm font-black text-slate-900">
+                    {formatPrice(item.amount, { currency: activeTripCurrency })}
+                  </span>
                   {item.type === 'manual' && (
                     <button
                       onClick={() => handleDeleteEntry(item.rawId)}
@@ -317,6 +347,15 @@ export const TripBudgetPage: React.FC = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Exchange rates footer note */}
+      <div className="p-4 bg-slate-100/70 rounded-2xl flex items-center justify-between text-xs text-slate-500">
+        <span className="flex items-center gap-1.5 font-medium">
+          <Info className="w-4 h-4 text-brand-600" />
+          Live conversion active: {activeTripCurrency} (Base DB Storage: USD)
+        </span>
+        <span>Rates last updated: <strong className="text-slate-700">{ratesLastUpdated}</strong></span>
       </div>
 
       {/* Add Expense Modal */}
@@ -345,18 +384,24 @@ export const TripBudgetPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Amount (in USD base) *
+              Amount ({currencySymbol} {activeTripCurrency}) *
             </label>
-            <input
-              type="number"
-              step="0.01"
-              required
-              min="0"
-              value={expenseAmount}
-              onChange={(e) => setExpenseAmount(e.target.value)}
-              placeholder="e.g. 150.00"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none font-semibold"
-            />
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">{currencySymbol}</span>
+              <input
+                type="number"
+                step="0.01"
+                required
+                min="0"
+                value={expenseAmountInput}
+                onChange={(e) => setExpenseAmountInput(e.target.value)}
+                placeholder="e.g. 150.00"
+                className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none font-semibold"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Will be converted and stored in USD base (~${expenseAmountInput ? convertToUsd(Number(expenseAmountInput), activeTripCurrency).toFixed(2) : '0.00'} USD)
+            </p>
           </div>
 
           <div>

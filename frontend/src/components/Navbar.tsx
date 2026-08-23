@@ -87,7 +87,7 @@ export const Navbar: React.FC = () => {
 
           {/* Right Section: Currency Selector + Profile/Actions */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Currency Selector Dropdown */}
+            {/* Currency Selector Dropdown (7 Currencies) */}
             <div className="flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <Coins className="w-3.5 h-3.5 text-brand-600" />
               <select
