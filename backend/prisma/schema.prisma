@@ -1,0 +1,129 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               Int                @id @default(autoincrement())
+  name             String             @db.VarChar(255)
+  email            String             @unique @db.VarChar(255)
+  password_hash    String             @db.VarChar(255)
+  profile_photo_url String?           @db.Text
+  language_pref    String?            @default("en") @db.VarChar(10)
+  role             String             @default("user") @db.VarChar(20)
+  is_disabled      Boolean            @default(false)
+  created_at       DateTime           @default(now()) @db.Timestamp(6)
+
+  trips            Trip[]
+  saved_destinations SavedDestination[]
+
+  @@map("users")
+}
+
+model City {
+  id               Int                @id @default(autoincrement())
+  name             String             @db.VarChar(255)
+  country          String             @db.VarChar(255)
+  region           String?            @db.VarChar(255)
+  cost_index       Int?
+  popularity_score Int                @default(0)
+  image_url        String?            @db.Text
+
+  stops            Stop[]
+  activities       Activity[]
+  saved_by         SavedDestination[]
+
+  @@map("cities")
+}
+
+model Trip {
+  id              Int               @id @default(autoincrement())
+  user_id         Int
+  name            String            @db.VarChar(255)
+  description     String?           @db.Text
+  cover_photo_url String?           @db.Text
+  start_date      DateTime          @db.Date
+  end_date        DateTime          @db.Date
+  target_budget   Decimal?          @db.Decimal(10, 2)
+  is_public       Boolean           @default(false)
+  public_slug     String?           @unique @db.VarChar(64)
+  created_at      DateTime          @default(now()) @db.Timestamp(6)
+
+  user            User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  stops           Stop[]
+  budget_entries  BudgetEntry[]
+
+  @@map("trips")
+}
+
+model Stop {
+  id              Int               @id @default(autoincrement())
+  trip_id         Int
+  city_id         Int
+  arrival_date    DateTime          @db.Date
+  departure_date  DateTime          @db.Date
+  order_index     Int
+
+  trip            Trip              @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+  city            City              @relation(fields: [city_id], references: [id])
+  trip_activities TripActivity[]
+
+  @@map("stops")
+}
+
+model Activity {
+  id                     Int            @id @default(autoincrement())
+  city_id                Int
+  name                   String         @db.VarChar(255)
+  category               String?        @db.VarChar(50)
+  description            String?        @db.Text
+  image_url              String?        @db.Text
+  estimated_cost         Decimal?       @db.Decimal(10, 2)
+  estimated_duration_mins Int?
+
+  city                   City           @relation(fields: [city_id], references: [id])
+  trip_activities        TripActivity[]
+
+  @@map("activities")
+}
+
+model TripActivity {
+  id              Int            @id @default(autoincrement())
+  stop_id         Int
+  activity_id     Int
+  scheduled_date  DateTime?      @db.Date
+  scheduled_time  String?        @db.VarChar(20)
+  cost_override   Decimal?       @db.Decimal(10, 2)
+
+  stop            Stop           @relation(fields: [stop_id], references: [id], onDelete: Cascade)
+  activity        Activity       @relation(fields: [activity_id], references: [id])
+
+  @@map("trip_activities")
+}
+
+model BudgetEntry {
+  id       Int      @id @default(autoincrement())
+  trip_id  Int
+  category String   @db.VarChar(50)
+  amount   Decimal  @db.Decimal(10, 2)
+  note     String?  @db.Text
+
+  trip     Trip     @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+
+  @@map("budget_entries")
+}
+
+model SavedDestination {
+  id      Int   @id @default(autoincrement())
+  user_id Int
+  city_id Int
+
+  user    User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  city    City  @relation(fields: [city_id], references: [id])
+
+  @@map("saved_destinations")
+}
